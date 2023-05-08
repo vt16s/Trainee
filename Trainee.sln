@@ -5,6 +5,8 @@ VisualStudioVersion = 17.5.33530.505
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "D3D11_Cube", "D3D11_Cube\D3D11_Cube.vcxproj", "{7E4F89C0-D7D4-4F97-B904-40C829006B0F}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "D3D11_Image", "D3D11_Image\D3D11_Image.vcxproj", "{0B43DB93-D478-4A3E-8836-D52BDC26CA67}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -21,6 +23,14 @@ Global
 		{7E4F89C0-D7D4-4F97-B904-40C829006B0F}.Release|x64.Build.0 = Release|x64
 		{7E4F89C0-D7D4-4F97-B904-40C829006B0F}.Release|x86.ActiveCfg = Release|Win32
 		{7E4F89C0-D7D4-4F97-B904-40C829006B0F}.Release|x86.Build.0 = Release|Win32
+		{0B43DB93-D478-4A3E-8836-D52BDC26CA67}.Debug|x64.ActiveCfg = Debug|x64
+		{0B43DB93-D478-4A3E-8836-D52BDC26CA67}.Debug|x64.Build.0 = Debug|x64
+		{0B43DB93-D478-4A3E-8836-D52BDC26CA67}.Debug|x86.ActiveCfg = Debug|Win32
+		{0B43DB93-D478-4A3E-8836-D52BDC26CA67}.Debug|x86.Build.0 = Debug|Win32
+		{0B43DB93-D478-4A3E-8836-D52BDC26CA67}.Release|x64.ActiveCfg = Release|x64
+		{0B43DB93-D478-4A3E-8836-D52BDC26CA67}.Release|x64.Build.0 = Release|x64
+		{0B43DB93-D478-4A3E-8836-D52BDC26CA67}.Release|x86.ActiveCfg = Release|Win32
+		{0B43DB93-D478-4A3E-8836-D52BDC26CA67}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
