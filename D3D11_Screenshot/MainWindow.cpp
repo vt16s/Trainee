@@ -105,8 +105,8 @@ HRESULT MainWindow::Run( std::shared_ptr<Renderer> renderer )
         }
         else
         {
-            // Present the frame to the screen.
-          //  renderer->Present();
+            // Draw and present the frame to the screen.
+            renderer->DrawFrame();
         }
     }
 

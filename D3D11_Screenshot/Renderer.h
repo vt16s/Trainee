@@ -19,14 +19,13 @@ public:
     Renderer();
     ~Renderer();
     HRESULT InitD3D(HWND hWnd);
+    bool GetFrame();
     void DrawFrame();
-    void Present();
 
 private:
     void CreateSharedSurf();
     void MakeRTV();
     void CreateShaders();
-    void GetFrame();
 
     HWND m_windowHandle;
     Microsoft::WRL::ComPtr <ID3D11Device>             m_device;
@@ -43,4 +42,5 @@ private:
     Microsoft::WRL::ComPtr <ID3D11Texture2D>          m_sharedSurf;
     Microsoft::WRL::ComPtr <ID3D11Texture2D>          m_acquiredDesktopImage;
     Microsoft::WRL::ComPtr <IDXGIOutputDuplication>   m_deskDupl;
+    Microsoft::WRL::ComPtr <IDXGIResource>            m_deskResource;
 };

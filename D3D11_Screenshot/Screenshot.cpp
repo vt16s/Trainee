@@ -29,6 +29,7 @@ INT WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
     if (SUCCEEDED(hr))
     {
+        CoInitialize(nullptr);
         // Instantiate the renderer.
         std::shared_ptr<Renderer> renderer = std::shared_ptr<Renderer>(new Renderer());
         hr = renderer->InitD3D(winMain->GetWindowHandle());
@@ -36,10 +37,9 @@ INT WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         if (FAILED(hr))
             return hr;
 
-        renderer->DrawFrame();
-
-        // Run the program.
-        hr = winMain->Run(renderer);
+        if(renderer->GetFrame())
+            // Run the program.
+            hr = winMain->Run(renderer);
     }
 
     // Cleanup is handled in destructors.

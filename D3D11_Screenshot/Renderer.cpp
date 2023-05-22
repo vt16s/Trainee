@@ -1,12 +1,12 @@
 //-----------------------------------------------------------------------------
 // Includes
 //-----------------------------------------------------------------------------
+#include "Renderer.h"
 #include <DirectXMath.h>
 #include <assert.h>
 #include <float.h>
-
-#include "Renderer.h"
-//#include "MainWindow.h"
+#include <wincodec.h>
+#include "ScreenGrab11.h"
 
 #include "PixelShader.h"
 #include "VertexShader.h"
@@ -79,50 +79,35 @@ HRESULT Renderer::InitD3D(HWND hWnd)
     assert(SUCCEEDED(hr));
 
     // Get DXGI factory
-    IDXGIDevice* DxgiDevice = nullptr;
-    hr = m_device->QueryInterface(__uuidof(IDXGIDevice), reinterpret_cast<void**>(&DxgiDevice));
-
+    Microsoft::WRL::ComPtr <IDXGIDevice> DxgiDevice;
+    hr = m_device->QueryInterface(__uuidof(IDXGIDevice), reinterpret_cast<void**>(DxgiDevice.GetAddressOf()));
     assert(SUCCEEDED(hr));
 
-    IDXGIAdapter* DxgiAdapter = nullptr;
-    hr = DxgiDevice->GetParent(__uuidof(IDXGIAdapter), reinterpret_cast<void**>(&DxgiAdapter));
-    DxgiDevice->Release();
-    DxgiDevice = nullptr;
-
+    Microsoft::WRL::ComPtr <IDXGIAdapter> DxgiAdapter;
+    hr = DxgiDevice->GetParent(__uuidof(IDXGIAdapter), reinterpret_cast<void**>(DxgiAdapter.GetAddressOf()));
     assert(SUCCEEDED(hr));
 
     hr = DxgiAdapter->GetParent(__uuidof(IDXGIFactory2), reinterpret_cast<void**>(m_factory.GetAddressOf()));
     assert(SUCCEEDED(hr));
 
-    IDXGIOutput* DxgiOutput = nullptr;
+    Microsoft::WRL::ComPtr <IDXGIOutput> DxgiOutput;
 
     // Figure out right dimensions for full size desktop texture and # of outputs to duplicate
 
     hr = DxgiAdapter->EnumOutputs(0, &DxgiOutput);
-    if (FAILED(hr))
-    {
-        DxgiAdapter->Release();
-        DxgiAdapter = nullptr;
-        assert(SUCCEEDED(hr));
-    }
+    assert(SUCCEEDED(hr));
+
     DXGI_OUTPUT_DESC DesktopDesc;
     DxgiOutput->GetDesc(&DesktopDesc);
 
     // QI for Output 1
-    IDXGIOutput1* DxgiOutput1 = nullptr;
-    hr = DxgiOutput->QueryInterface(__uuidof(DxgiOutput1), reinterpret_cast<void**>(&DxgiOutput1));
-    DxgiOutput->Release();
-    DxgiOutput = nullptr;
+    Microsoft::WRL::ComPtr <IDXGIOutput1> DxgiOutput1;
+    hr = DxgiOutput->QueryInterface(__uuidof(DxgiOutput1), reinterpret_cast<void**>(DxgiOutput1.GetAddressOf()));
     assert(SUCCEEDED(hr));
 
     // Create desktop duplication
     hr = DxgiOutput1->DuplicateOutput(m_device.Get(), m_deskDupl.GetAddressOf());
-    DxgiOutput1->Release();
-    DxgiOutput1 = nullptr;
     assert(SUCCEEDED(hr));
-
-    DxgiAdapter->Release();
-    DxgiAdapter = nullptr;
 
     // Get window size
     RECT WindowRect;
@@ -223,13 +208,12 @@ void Renderer::MakeRTV()
     HRESULT hr;
 
     // Get backbuffer
-    ID3D11Texture2D* BackBuffer = nullptr;
-    hr = m_swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&BackBuffer));
+    Microsoft::WRL::ComPtr <ID3D11Texture2D> backBuffer;
+    hr = m_swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(backBuffer.GetAddressOf()));
     assert(SUCCEEDED(hr));
 
     // Create a render target view
-    hr = m_device->CreateRenderTargetView(BackBuffer, nullptr, m_renderTarget.GetAddressOf());
-    BackBuffer->Release();
+    hr = m_device->CreateRenderTargetView(backBuffer.Get(), nullptr, m_renderTarget.GetAddressOf());
     assert(SUCCEEDED(hr));
 
     // Set new render target
@@ -267,44 +251,46 @@ void Renderer::CreateShaders()
 //-----------------------------------------------------------------------------
 // Getting screen capture
 //-----------------------------------------------------------------------------
-void Renderer::GetFrame()
+bool Renderer::GetFrame()
 {
     HRESULT hr;
 
-    IDXGIResource* DesktopResource = nullptr;
-    DXGI_OUTDUPL_FRAME_INFO FrameInfo;
-
-    int tryCount = 4;
-
-    do
+    for (int i = 0; i < 10; ++i) 
     {
-        Sleep(10);
-
-        // Get new frame
-        hr = m_deskDupl->AcquireNextFrame(33, &FrameInfo, &DesktopResource);
-
-        if (SUCCEEDED(hr))
-            break;
-
-        if (hr == DXGI_ERROR_WAIT_TIMEOUT)
+        DXGI_OUTDUPL_FRAME_INFO FrameInfo{};
+        hr = m_deskDupl->AcquireNextFrame(500, &FrameInfo, m_deskResource.GetAddressOf());
+        if (SUCCEEDED(hr) && (FrameInfo.LastPresentTime.QuadPart == 0)) 
         {
+            // If AcquireNextFrame() returns S_OK and
+            // fi.LastPresentTime.QuadPart == 0, it means
+            // AcquireNextFrame() didn't acquire next frame yet.
+            // We must wait next frame sync timing to retrieve
+            // actual frame data.
+            //
+            // Since method is successfully completed,
+            // we need to release the resource and frame explicitly.
+            m_deskResource->Release();
+            m_deskDupl->ReleaseFrame();
+            Sleep(1);
             continue;
         }
-        else if (FAILED(hr))
+        else 
             break;
-
-    } while (--tryCount > 0);
-
-    assert(SUCCEEDED(hr));
+    }
+    if (FAILED(hr))
+        return false;
 
     // QI for ID3D11Texture2D
-    hr = DesktopResource->QueryInterface(__uuidof(ID3D11Texture2D), reinterpret_cast<void**>(m_acquiredDesktopImage.GetAddressOf()));
-    DesktopResource->Release();
-    DesktopResource = nullptr;
-
-    assert(SUCCEEDED(hr));
+    hr = m_deskResource->QueryInterface(__uuidof(ID3D11Texture2D), reinterpret_cast<void**>(m_acquiredDesktopImage.GetAddressOf()));
+    if (FAILED(hr))
+        return false;
+  
     m_context->CopyResource(m_sharedSurf.Get(), m_acquiredDesktopImage.Get());
 
+    hr = SaveWICTextureToFile(m_context.Get(), m_sharedSurf.Get(), GUID_ContainerFormatPng, L"SCREENSHOT.PNG");
+    assert(SUCCEEDED(hr));
+
+    return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -314,7 +300,7 @@ void Renderer::DrawFrame()
 {
     HRESULT hr;
 
-    GetFrame();
+   // GetFrame();
 
     // Vertices for drawing whole texture
     VERTEX Vertices[NUMVERTICES] =
@@ -337,8 +323,7 @@ void Renderer::DrawFrame()
     ShaderDesc.Texture2D.MipLevels = FrameDesc.MipLevels;
 
     // Create new shader resource view
-    ID3D11ShaderResourceView* ShaderResource = nullptr;
-    hr = m_device->CreateShaderResourceView(m_sharedSurf.Get(), &ShaderDesc, &ShaderResource);
+    hr = m_device->CreateShaderResourceView(m_sharedSurf.Get(), &ShaderDesc, m_shaderResourceView.GetAddressOf());
     assert(SUCCEEDED(hr));
 
     // Set resources
@@ -347,7 +332,7 @@ void Renderer::DrawFrame()
     FLOAT blendFactor[4] = { 0.f, 0.f, 0.f, 0.f };
 
     m_context->OMSetBlendState(nullptr, blendFactor, 0xffffffff);
-    m_context->PSSetShaderResources(0, 1, &ShaderResource);
+    m_context->PSSetShaderResources(0, 1, m_shaderResourceView.GetAddressOf());
     m_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     D3D11_BUFFER_DESC BufferDesc;
@@ -360,37 +345,17 @@ void Renderer::DrawFrame()
     RtlZeroMemory(&InitData, sizeof(InitData));
     InitData.pSysMem = Vertices;
 
-    ID3D11Buffer* VertexBuffer = nullptr;
+    Microsoft::WRL::ComPtr <ID3D11Buffer> VertexBuffer;
 
     // Create vertex buffer
-    hr = m_device->CreateBuffer(&BufferDesc, &InitData, &VertexBuffer);
-    if (FAILED(hr))
-    {
-        ShaderResource->Release();
-        ShaderResource = nullptr;
-        assert(SUCCEEDED(hr));
-    }
-    m_context->IASetVertexBuffers(0, 1, &VertexBuffer, &Stride, &Offset);
+    hr = m_device->CreateBuffer(&BufferDesc, &InitData, VertexBuffer.GetAddressOf());
+    assert(SUCCEEDED(hr));
+
+    m_context->IASetVertexBuffers(0, 1, VertexBuffer.GetAddressOf(), &Stride, &Offset);
 
     // Draw textured quad onto render target
     m_context->Draw(NUMVERTICES, 0);
-
-    VertexBuffer->Release();
-    VertexBuffer = nullptr;
-
-    // Release shader resource
-    ShaderResource->Release();
-    ShaderResource = nullptr;
-
-     m_swapChain->Present(1, 0);
-}
-
-//-----------------------------------------------------------------------------
-// Present frame:
-// Show the frame on the primary surface.
-//-----------------------------------------------------------------------------
-void Renderer::Present()
-{
+    // Present the frame to the screen.
     m_swapChain->Present(1, 0);
 }
 
