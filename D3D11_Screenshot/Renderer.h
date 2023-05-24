@@ -20,6 +20,7 @@ public:
     ~Renderer();
     HRESULT InitD3D(HWND hWnd);
     bool GetFrame();
+    void SaveToPng();
     void DrawFrame();
 
 private:
@@ -39,8 +40,11 @@ private:
     Microsoft::WRL::ComPtr <ID3D11PixelShader>        m_pixelShader;
     Microsoft::WRL::ComPtr <ID3D11ShaderResourceView> m_shaderResourceView;
     Microsoft::WRL::ComPtr <ID3D11SamplerState>       m_samplerState;
+    Microsoft::WRL::ComPtr <ID3D11BlendState>         m_blendState;
     Microsoft::WRL::ComPtr <ID3D11Texture2D>          m_sharedSurf;
     Microsoft::WRL::ComPtr <ID3D11Texture2D>          m_acquiredDesktopImage;
     Microsoft::WRL::ComPtr <IDXGIOutputDuplication>   m_deskDupl;
     Microsoft::WRL::ComPtr <IDXGIResource>            m_deskResource;
+    time_t m_prevTime;
+    UINT8 m_numberInSecond;
 };

@@ -19,7 +19,7 @@
 MainWindow::MainWindow()
 {
     m_windowClassName = L"Direct3DWindowClass";
-    m_hInstance = NULL;
+    m_hInstance       = nullptr;
 }
 
 //-----------------------------------------------------------------------------
@@ -29,31 +29,37 @@ HRESULT MainWindow::CreateDesktopWindow()
 {
     // Window resources are dealt with here.
 
-    if (m_hInstance == NULL)
-        m_hInstance = (HINSTANCE)GetModuleHandle(NULL);
-
-    HICON hIcon = NULL;
-    WCHAR szExePath[MAX_PATH];
-    GetModuleFileName(NULL, szExePath, MAX_PATH);
-
-    // If the icon is NULL, then use the first one found in the exe
-    if (hIcon == NULL)
-        hIcon = ExtractIcon(m_hInstance, szExePath, 0);
+    if (m_hInstance == nullptr)
+        m_hInstance = (HINSTANCE)GetModuleHandle(nullptr);
 
     // Register the windows class
-    WNDCLASS wndClass      = {};
+  /*  WNDCLASS wndClass{};
     wndClass.style         = CS_HREDRAW | CS_VREDRAW;
     wndClass.lpfnWndProc   = MainWindow::StaticWindowProc;
     wndClass.cbClsExtra    = 0;
     wndClass.cbWndExtra    = 0;
     wndClass.hInstance     = m_hInstance;
-    wndClass.hIcon         = hIcon;
+    wndClass.hIcon         = nullptr;
     wndClass.hCursor       = LoadCursor(NULL, IDC_ARROW);
     wndClass.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
     wndClass.lpszMenuName  = NULL;
-    wndClass.lpszClassName = m_windowClassName.c_str();
+    wndClass.lpszClassName = m_windowClassName.c_str();*/
 
-    if (!RegisterClass(&wndClass))
+    WNDCLASSEXW wndClass{};
+    wndClass.cbSize        = sizeof(WNDCLASSEXW);
+    wndClass.style         = CS_HREDRAW | CS_VREDRAW;
+    wndClass.lpfnWndProc   = MainWindow::StaticWindowProc;
+    wndClass.cbClsExtra    = 0;
+    wndClass.cbWndExtra    = 0;
+    wndClass.hInstance     = m_hInstance;
+    wndClass.hIcon         = nullptr;
+    wndClass.hCursor       = LoadCursor(NULL, IDC_ARROW);
+    wndClass.hbrBackground = nullptr;
+    wndClass.lpszMenuName  = nullptr;
+    wndClass.lpszClassName = m_windowClassName.c_str();
+    wndClass.hIconSm       = nullptr;
+
+    if (!RegisterClassExW(&wndClass))
     {
         DWORD dwError = GetLastError();
         if (dwError != ERROR_CLASS_ALREADY_EXISTS)
@@ -64,21 +70,21 @@ HRESULT MainWindow::CreateDesktopWindow()
     AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
 
     // Create the window for our viewport.
-    m_hWnd = CreateWindow(
+    m_hWnd = CreateWindowW(
         m_windowClassName.c_str(),
-        L"Image",
+        L"Screenshot",
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
         wr.right - wr.left,
         wr.bottom - wr.top,
-        NULL,
-        NULL,
+        nullptr,
+        nullptr,
         m_hInstance,
-        NULL
+        nullptr
     );
 
-    if (m_hWnd == NULL)
+    if (m_hWnd == nullptr)
     {
         DWORD dwError = GetLastError();
         return HRESULT_FROM_WIN32(dwError);
@@ -98,15 +104,20 @@ HRESULT MainWindow::Run( std::shared_ptr<Renderer> renderer )
     MSG  msg = {};
     while (WM_QUIT != msg.message)
     {
-        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+        if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
         {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
         else
         {
-            // Draw and present the frame to the screen.
-            renderer->DrawFrame();
+              if (renderer->GetFrame())
+              {
+                  // Saving to png
+                  renderer->SaveToPng();
+                  // Draw and present the frame to the screen.
+              //    renderer->DrawFrame();
+              }
         }
     }
 

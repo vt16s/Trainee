@@ -6,6 +6,8 @@
 #include <assert.h>
 #include <float.h>
 #include <wincodec.h>
+#include <string>
+#include <ctime>
 #include "ScreenGrab11.h"
 
 #include "PixelShader.h"
@@ -29,7 +31,7 @@ typedef struct _VERTEX
 //-----------------------------------------------------------------------------
 // Constructor
 //-----------------------------------------------------------------------------
-Renderer::Renderer()
+Renderer::Renderer() : m_prevTime(0), m_numberInSecond(1)
 {
 }
 
@@ -167,9 +169,25 @@ HRESULT Renderer::InitD3D(HWND hWnd)
     assert(SUCCEEDED(hr));
     m_context->PSSetSamplers(0, 1, m_samplerState.GetAddressOf());
 
+    // Create the blend state
+    D3D11_BLEND_DESC BlendStateDesc;
+    BlendStateDesc.AlphaToCoverageEnable = FALSE;
+    BlendStateDesc.IndependentBlendEnable = FALSE;
+    BlendStateDesc.RenderTarget[0].BlendEnable = TRUE;
+    BlendStateDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+    BlendStateDesc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+    BlendStateDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+    BlendStateDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+    BlendStateDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+    BlendStateDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+    BlendStateDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+    hr = m_device->CreateBlendState(&BlendStateDesc, m_blendState.GetAddressOf());
+    assert(SUCCEEDED(hr));
+    m_context->PSSetSamplers(0, 1, m_samplerState.GetAddressOf());
+
     // Create shaders and input layout
     CreateShaders();
-
+   
     return hr;
 }
 
@@ -196,7 +214,7 @@ void Renderer::CreateSharedSurf()
     desc.MipLevels = 1;
     desc.CPUAccessFlags = 0;
     desc.Usage = D3D11_USAGE_DEFAULT;
-    hr = m_device->CreateTexture2D(&desc, NULL, m_sharedSurf.GetAddressOf());
+    hr = m_device->CreateTexture2D(&desc, nullptr, m_sharedSurf.GetAddressOf());
     assert(SUCCEEDED(hr));
 }
 
@@ -255,7 +273,10 @@ bool Renderer::GetFrame()
 {
     HRESULT hr;
 
-    for (int i = 0; i < 10; ++i) 
+    DXGI_OUTDUPL_FRAME_INFO FrameInfo{};
+    hr = m_deskDupl->AcquireNextFrame(500, &FrameInfo, m_deskResource.GetAddressOf());
+
+   /* for (int i = 0; i < 10; ++i)
     {
         DXGI_OUTDUPL_FRAME_INFO FrameInfo{};
         hr = m_deskDupl->AcquireNextFrame(500, &FrameInfo, m_deskResource.GetAddressOf());
@@ -276,7 +297,8 @@ bool Renderer::GetFrame()
         }
         else 
             break;
-    }
+    }*/
+   // assert(SUCCEEDED(hr));
     if (FAILED(hr))
         return false;
 
@@ -286,11 +308,42 @@ bool Renderer::GetFrame()
         return false;
   
     m_context->CopyResource(m_sharedSurf.Get(), m_acquiredDesktopImage.Get());
-
-    hr = SaveWICTextureToFile(m_context.Get(), m_sharedSurf.Get(), GUID_ContainerFormatPng, L"SCREENSHOT.PNG");
-    assert(SUCCEEDED(hr));
-
+    m_deskDupl->ReleaseFrame();
     return true;
+}
+
+//-----------------------------------------------------------------------------
+// Sawing screen capture to png file
+//-----------------------------------------------------------------------------
+void Renderer::SaveToPng()
+{
+    // Checking the existence of a directory
+    std::string dirName = "screenshots";
+    DWORD dwFileAttributes = GetFileAttributesA(dirName.c_str());
+    if (dwFileAttributes != FILE_ATTRIBUTE_DIRECTORY)
+    {
+        // if directory does not exist - create directory
+        if (!CreateDirectoryA(dirName.c_str(), nullptr))
+        {
+            MessageBox(NULL, (LPCWSTR)L"Can't create directory", (LPCWSTR)L"Info", MB_OK);
+            return;
+        }
+    }
+
+    time_t currentTime = time(nullptr);
+    if (currentTime == m_prevTime)
+    {
+        ++m_numberInSecond;
+    }
+    else
+    {
+        m_numberInSecond = 1;
+        m_prevTime = currentTime;
+    }
+    std::wstring fileName = L"./screenshots/SCREENSHOT_" + std::to_wstring(currentTime) + L"_" + std::to_wstring(m_numberInSecond) + L".PNG";
+
+    HRESULT hr = SaveWICTextureToFile(m_context.Get(), m_sharedSurf.Get(), GUID_ContainerFormatPng, fileName.c_str());
+    assert(SUCCEEDED(hr));
 }
 
 //-----------------------------------------------------------------------------
@@ -326,15 +379,6 @@ void Renderer::DrawFrame()
     hr = m_device->CreateShaderResourceView(m_sharedSurf.Get(), &ShaderDesc, m_shaderResourceView.GetAddressOf());
     assert(SUCCEEDED(hr));
 
-    // Set resources
-    UINT Stride = sizeof(VERTEX);
-    UINT Offset = 0;
-    FLOAT blendFactor[4] = { 0.f, 0.f, 0.f, 0.f };
-
-    m_context->OMSetBlendState(nullptr, blendFactor, 0xffffffff);
-    m_context->PSSetShaderResources(0, 1, m_shaderResourceView.GetAddressOf());
-    m_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
     D3D11_BUFFER_DESC BufferDesc;
     RtlZeroMemory(&BufferDesc, sizeof(BufferDesc));
     BufferDesc.Usage = D3D11_USAGE_DEFAULT;
@@ -350,6 +394,15 @@ void Renderer::DrawFrame()
     // Create vertex buffer
     hr = m_device->CreateBuffer(&BufferDesc, &InitData, VertexBuffer.GetAddressOf());
     assert(SUCCEEDED(hr));
+
+    // Set resources
+    UINT Stride = sizeof(VERTEX);
+    UINT Offset = 0;
+    FLOAT blendFactor[4] = { 0.f, 0.f, 0.f, 0.f };
+
+    m_context->OMSetBlendState(/*nullptr*/m_blendState.Get(), blendFactor, 0xffffffff);
+    m_context->PSSetShaderResources(0, 1, m_shaderResourceView.GetAddressOf());
+    m_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     m_context->IASetVertexBuffers(0, 1, VertexBuffer.GetAddressOf(), &Stride, &Offset);
 

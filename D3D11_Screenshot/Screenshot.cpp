@@ -37,9 +37,13 @@ INT WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         if (FAILED(hr))
             return hr;
 
-        if(renderer->GetFrame())
+      //  if (renderer->GetFrame())
+      //  {
+            // Saving to png
+      //      renderer->SaveToPng();
             // Run the program.
             hr = winMain->Run(renderer);
+      //  }
     }
 
     // Cleanup is handled in destructors.
