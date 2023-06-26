@@ -101,6 +101,7 @@ HRESULT MainWindow::Run( std::shared_ptr<Renderer> renderer )
         ShowWindow(m_hWnd, SW_SHOW);
 
     // The render loop is controlled here.
+    HRESULT hr_coInit = CoInitialize(nullptr);
     MSG  msg = {};
     while (WM_QUIT != msg.message)
     {
@@ -114,12 +115,16 @@ HRESULT MainWindow::Run( std::shared_ptr<Renderer> renderer )
               if (renderer->GetFrame())
               {
                   // Saving to png
-                  renderer->SaveToPng();
+                  if(SUCCEEDED(hr_coInit))
+                      renderer->SaveToPng();
                   // Draw and present the frame to the screen.
-              //    renderer->DrawFrame();
+                  renderer->DrawFrame();
               }
         }
     }
+
+    if (SUCCEEDED(hr_coInit))
+        CoUninitialize();
 
     return hr;
 }

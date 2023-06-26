@@ -122,7 +122,7 @@ void Renderer::CreateDeviceDependentResources()
         &ImageHeight,
         &ImageChannels, ImageDesiredChannels);
     assert(ImageData);
-
+    int aaa = sizeof(*ImageData);
     int ImagePitch = ImageWidth * 4;
 
     // Texture

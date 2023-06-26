@@ -29,7 +29,6 @@ INT WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
     if (SUCCEEDED(hr))
     {
-        CoInitialize(nullptr);
         // Instantiate the renderer.
         std::shared_ptr<Renderer> renderer = std::shared_ptr<Renderer>(new Renderer());
         hr = renderer->InitD3D(winMain->GetWindowHandle());
